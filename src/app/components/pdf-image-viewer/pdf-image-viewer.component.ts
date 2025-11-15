@@ -19,10 +19,7 @@ export class PdfImageViewerComponent implements OnDestroy {
     if (input.files && input.files.length > 0) {
       const newFiles = Array.from(input.files).filter((file) => {
         // Aceitar por tipo MIME
-        if (
-          file.type === 'application/pdf' ||
-          file.type.startsWith('image/')
-        ) {
+        if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
           return true;
         }
 

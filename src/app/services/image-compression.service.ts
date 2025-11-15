@@ -25,10 +25,10 @@ export class ImageCompressionService {
 
   // Opções padrão otimizadas para velocidade
   private readonly DEFAULT_OPTIONS: CompressionOptions = {
-    maxSizeMB: 0.8, // Reduzido para 0.8MB
-    maxWidthOrHeight: 1600, // Reduzido para 1600px (suficiente para PDFs)
+    maxSizeMB: 0.5, // Reduzido para 0.5MB (mais agressivo)
+    maxWidthOrHeight: 1200, // Reduzido para 1200px (menos pixels = mais rápido)
     useWebWorker: true, // Usar web worker para não bloquear UI
-    initialQuality: 0.7, // Qualidade inicial em 70% para compressão mais rápida
+    initialQuality: 0.6, // Qualidade em 60% (mais rápido, ainda bom para PDFs)
   };
 
   /**
@@ -65,7 +65,9 @@ export class ImageCompressionService {
       // Skip compressão se arquivo já é pequeno (< 500KB)
       if (originalSize < 500 * 1024) {
         const skipTime = ((performance.now() - fileStartTime) / 1000).toFixed(2);
-        console.log(`⚡ ${file.name} [${originalSizeMB}MB] - já é pequeno, usando original (${skipTime}s)`);
+        console.log(
+          `⚡ ${file.name} [${originalSizeMB}MB] - já é pequeno, usando original (${skipTime}s)`
+        );
         const result: CompressionResult = {
           originalSize,
           compressedSize: originalSize,
@@ -85,7 +87,9 @@ export class ImageCompressionService {
       const compressionTime = ((performance.now() - compressionStartTime) / 1000).toFixed(2);
       const savingsPercent = (((originalSize - compressedSize) / originalSize) * 100).toFixed(1);
 
-      console.log(`✅ ${file.name}: ${originalSizeMB}MB → ${compressedSizeMB}MB (${savingsPercent}% menor) em ${compressionTime}s`);
+      console.log(
+        `✅ ${file.name}: ${originalSizeMB}MB → ${compressedSizeMB}MB (${savingsPercent}% menor) em ${compressionTime}s`
+      );
 
       const result: CompressionResult = {
         originalSize,
@@ -137,7 +141,12 @@ export class ImageCompressionService {
     const savingsPercent = ((totalSavings / totalOriginal) * 100).toFixed(1);
 
     console.log(`\n✅ COMPRESSÃO CONCLUÍDA`);
-    console.log(`   Total: ${(totalOriginal / (1024 * 1024)).toFixed(2)}MB → ${(totalCompressed / (1024 * 1024)).toFixed(2)}MB`);
+    console.log(
+      `   Total: ${(totalOriginal / (1024 * 1024)).toFixed(2)}MB → ${(
+        totalCompressed /
+        (1024 * 1024)
+      ).toFixed(2)}MB`
+    );
     console.log(`   Economia: ${(totalSavings / (1024 * 1024)).toFixed(2)}MB (${savingsPercent}%)`);
     console.log(`   ⏱️  Tempo total: ${duration}s`);
     console.log(`═══════════════════════════════════\n`);
@@ -163,7 +172,9 @@ export class ImageCompressionService {
     }
 
     try {
-      console.log(`� Total de arquivos: ${files.length} (${imageFiles.length} imagens, ${otherFiles.length} PDFs)`);
+      console.log(
+        `� Total de arquivos: ${files.length} (${imageFiles.length} imagens, ${otherFiles.length} PDFs)`
+      );
       const compressedResults = await this.compressMultipleImagesParallel(imageFiles, options);
 
       // Combinar PDFs + imagens comprimidas na ordem original

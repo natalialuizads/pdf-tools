@@ -19,9 +19,22 @@
     <div class="file-list-panel">
       <h2>Selected Files</h2>
       @if (files().length === 0) {
-        <p>No files selected.</p>
+      <p>No files selected.</p>
+      } @if (files().length > 0) {
+      <div class="file-list">
+        <div
+          *ngFor="let file of files(); let i = index"
+          (click)="selectFileForPreview(file)"
+          class="file-item"
+        >
+          {{ file.name }} ({{ file.type }})<button
+            (click)="$event.stopPropagation(); removeFile(i)"
+          >
+            X
+          </button>
+        </div>
+      </div>
       }
-      @if (files().length > 0) {<div class="file-list"><div *ngFor="let file of files(); let i = index" (click)="selectFileForPreview(file)" class="file-item">{{ file.name }} ({{ file.type }})<button (click)="$event.stopPropagation(); removeFile(i)">X</button></div></div>}
     </div>
   </div>
 </div>

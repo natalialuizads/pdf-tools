@@ -71,50 +71,80 @@ export class PdfValidationService {
     file?: File
   ): Promise<PdfValidationResult> {
     try {
-      // Tenta carregar o documento sem senha
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
+      // ⚡ Otimização: Verificar primeiros bytes para detectar PDF válido
+      const view = new Uint8Array(arrayBuffer);
+      const header = String.fromCharCode(...view.slice(0, 5));
 
-      // Extrai metadados
-      const metadata = await pdf.getMetadata().catch(() => null);
-      const info = metadata?.info as { [key: string]: unknown } | undefined;
+      if (header !== '%PDF-') {
+        return {
+          isValid: false,
+          isEncrypted: false,
+          requiresPassword: false,
+          fileSize: file?.size,
+          fileType: file?.type,
+          error: 'Arquivo não é um PDF válido (header inválido)',
+        };
+      }
 
-      // Se conseguiu carregar sem erro, o PDF não requer senha
+      // ⚡ Otimização: Procurar por "Encrypt" nos primeiros 10KB (rápido)
+      const firstChunk = view.slice(0, Math.min(10000, view.length));
+      const chunkText = String.fromCharCode(...firstChunk);
+      const hasEncrypt = chunkText.includes('/Encrypt');
+
+      if (hasEncrypt) {
+        // Pode ser um PDF com senha - tenta carregar para confirmar
+        try {
+          const loadingTask = pdfjs.getDocument({
+            data: arrayBuffer,
+            disableAutoFetch: true, // ⚡ Não busca dados adicionais
+            rangeChunkSize: 32768, // ⚡ Tamanho menor para range requests
+          });
+
+          // ⚡ Timeout de 3s para evitar esperar muito
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 3000)
+          );
+
+          await Promise.race([loadingTask.promise, timeoutPromise]);
+
+          return {
+            isValid: true,
+            isEncrypted: false,
+            requiresPassword: false,
+            fileSize: file?.size,
+            fileType: file?.type,
+          };
+        } catch (innerError) {
+          // Provavelmente requer senha
+          const errorMsg = innerError instanceof Error ? innerError.message : '';
+          if (
+            errorMsg.includes('password') ||
+            errorMsg.includes('Authentication') ||
+            errorMsg.includes('timeout')
+          ) {
+            return {
+              isValid: true,
+              isEncrypted: true,
+              requiresPassword: true,
+              fileSize: file?.size,
+              fileType: file?.type,
+              error: 'PDF está protegido por senha',
+            };
+          }
+        }
+      }
+
+      // ⚡ Se passou pelas verificações, assumir que é válido (sem parse completo)
       return {
         isValid: true,
         isEncrypted: false,
         requiresPassword: false,
-        pageCount: pdf.numPages,
         fileSize: file?.size,
         fileType: file?.type,
-        metadata: {
-          title: info?.['Title'] ? String(info['Title']) : undefined,
-          author: info?.['Author'] ? String(info['Author']) : undefined,
-          subject: info?.['Subject'] ? String(info['Subject']) : undefined,
-          keywords: info?.['Keywords'] ? String(info['Keywords']) : undefined,
-        },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
 
-      // Verifica se o erro é relacionado a senha/encriptação
-      if (
-        errorMessage.includes('password') ||
-        errorMessage.includes('encrypted') ||
-        errorMessage.includes('Authentication') ||
-        errorMessage.includes('needs password')
-      ) {
-        return {
-          isValid: true,
-          isEncrypted: true,
-          requiresPassword: true,
-          fileSize: file?.size,
-          fileType: file?.type,
-          error: 'Este PDF está protegido por senha',
-        };
-      }
-
-      // Se for outro tipo de erro, o PDF pode ser inválido
       return {
         isValid: false,
         isEncrypted: false,
