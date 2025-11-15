@@ -6,6 +6,8 @@
       type="file"
       multiple
       accept=".pdf, .png, .jpg, .jpeg"
+      title="Selecione PDF ou imagens"
+      placeholder="Escolha arquivos"
       (change)="onFileSelected($event)"
     />
     <button (click)="mergeAndDownload()" [disabled]="files().length === 0">
@@ -17,17 +19,9 @@
     <div class="file-list-panel">
       <h2>Selected Files</h2>
       @if (files().length === 0) {
-      <p>No files selected.</p>
-      } @else {
-      <ul>
-        @for (file of files(); track $index) {
-        <li (click)="selectFileForPreview(file)">
-          {{ file.name }} ({{ file.type }})
-          <button (click)="$event.stopPropagation(); removeFile($index)">X</button>
-        </li>
-        }
-      </ul>
+        <p>No files selected.</p>
       }
+      @if (files().length > 0) {<div class="file-list"><div *ngFor="let file of files(); let i = index" (click)="selectFileForPreview(file)" class="file-item">{{ file.name }} ({{ file.type }})<button (click)="$event.stopPropagation(); removeFile(i)">X</button></div></div>}
     </div>
   </div>
 </div>

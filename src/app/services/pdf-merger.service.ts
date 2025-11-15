@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import { signal, Signal } from '@angular/core';
 import { PDFDocument, PDFPage, PDFImage } from 'pdf-lib';
 
 // ============ Types & Interfaces ============
@@ -17,14 +16,10 @@ interface ImageScaling {
   y: number;
 }
 
-export interface PdfPreviewContent {
-  url: string;
-  type: string;
-  fileName?: string;
-}
-
-// ============ PDF Merger Service (Responsável por unificar PDFs) ============
-
+/**
+ * Serviço responsável APENAS pela unificação de PDFs e imagens
+ * Sem validações - apenas processamento de merge
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -35,12 +30,13 @@ export class PdfMergerService {
     PNG: 'image/png',
   };
 
-  private readonly MAX_TOTAL_SIZE_BYTES = 7 * 1024 * 1024; // 7 MB
-
+  /**
+   * Unifica múltiplos PDFs e imagens em um único PDF
+   * Pressupõe que as validações já foram feitas pelo PdfManager
+   * @param files Array de arquivos (PDFs e imagens)
+   * @returns PDF unificado como Uint8Array
+   */
   async mergeFilesToPdf(files: File[]): Promise<Uint8Array> {
-    this.validateFiles(files);
-    this.validateTotalSize(files);
-
     const pdfDoc = await PDFDocument.create();
 
     for (const file of files) {
@@ -48,24 +44,6 @@ export class PdfMergerService {
     }
 
     return this.savePdfAsUint8Array(pdfDoc);
-  }
-
-  private validateFiles(files: File[]): void {
-    if (!files || files.length === 0) {
-      throw new Error('No files provided to merge');
-    }
-  }
-
-  private validateTotalSize(files: File[]): void {
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-
-    if (totalSize > this.MAX_TOTAL_SIZE_BYTES) {
-      const maxSizeMB = this.MAX_TOTAL_SIZE_BYTES / (1024 * 1024);
-      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-      throw new Error(
-        `Total file size (${totalSizeMB}MB) exceeds maximum allowed size of ${maxSizeMB}MB`
-      );
-    }
   }
 
   private async processFile(pdfDoc: PDFDocument, file: File): Promise<void> {
@@ -76,21 +54,13 @@ export class PdfMergerService {
       await this.mergePdfFile(pdfDoc, arrayBuffer);
     } else if (this.isImageFile(fileType)) {
       await this.mergeImageFile(pdfDoc, arrayBuffer, fileType);
-    } else {
-      console.warn(`Unsupported file type: ${fileType}`);
     }
   }
 
   private async mergePdfFile(pdfDoc: PDFDocument, arrayBuffer: ArrayBuffer): Promise<void> {
-    try {
-      const externalPdf = await PDFDocument.load(arrayBuffer);
-      const pageIndices = externalPdf.getPageIndices();
-      const copiedPages = await pdfDoc.copyPages(externalPdf, pageIndices);
-      copiedPages.forEach((page) => pdfDoc.addPage(page));
-    } catch (error) {
-      console.error('Error merging PDF file:', error);
-      throw new Error('Failed to merge PDF file');
-    }
+    const srcPdf = await PDFDocument.load(arrayBuffer);
+    const copiedPages = await pdfDoc.copyPages(srcPdf, srcPdf.getPageIndices());
+    copiedPages.forEach((page) => pdfDoc.addPage(page));
   }
 
   private async mergeImageFile(
@@ -98,78 +68,48 @@ export class PdfMergerService {
     arrayBuffer: ArrayBuffer,
     fileType: string
   ): Promise<void> {
-    try {
-      const image = await this.embedImage(pdfDoc, arrayBuffer, fileType);
-      if (image) {
-        this.addImageToPage(pdfDoc, image);
-      }
-    } catch (error) {
-      console.error('Error merging image file:', error);
-      throw new Error('Failed to merge image file');
+    let imageData: PDFImage;
+
+    if (fileType === this.SUPPORTED_FILE_TYPES.JPEG) {
+      imageData = await pdfDoc.embedJpg(arrayBuffer);
+    } else {
+      imageData = await pdfDoc.embedPng(arrayBuffer);
     }
+
+    const { width: imgWidth, height: imgHeight } = imageData.scale(1);
+    const scaling = this.calculateImageScaling({ width: 595, height: 842 }, imgWidth, imgHeight);
+
+    const page = pdfDoc.addPage([595, 842]);
+    this.embedImage(page, imageData, scaling);
   }
 
-  private async embedImage(
-    pdfDoc: PDFDocument,
-    arrayBuffer: ArrayBuffer,
-    fileType: string
-  ): Promise<PDFImage | null> {
-    switch (fileType) {
-      case this.SUPPORTED_FILE_TYPES.JPEG:
-        return pdfDoc.embedJpg(arrayBuffer);
-      case this.SUPPORTED_FILE_TYPES.PNG:
-        return pdfDoc.embedPng(arrayBuffer);
-      default:
-        console.warn(`Unsupported image type: ${fileType}`);
-        return null;
-    }
-  }
-
-  private isImageFile(fileType: string): boolean {
-    return (
-      fileType === this.SUPPORTED_FILE_TYPES.JPEG || fileType === this.SUPPORTED_FILE_TYPES.PNG
-    );
-  }
-
-  private addImageToPage(pdfDoc: PDFDocument, image: PDFImage): void {
-    const page = pdfDoc.addPage();
-    const pageDimensions = this.getPageDimensions(page);
-    const imageDimensions = this.getImageDimensions(image);
-    const scaling = this.calculateImageScaling(imageDimensions, pageDimensions);
-
+  private embedImage(page: PDFPage, image: PDFImage, scaling: ImageScaling): void {
     page.drawImage(image, {
       x: scaling.x,
-      y: scaling.y,
+      y: page.getHeight() - scaling.y - scaling.height,
       width: scaling.width,
       height: scaling.height,
     });
   }
 
-  private getPageDimensions(page: PDFPage): PageDimensions {
-    return {
-      width: page.getWidth(),
-      height: page.getHeight(),
-    };
-  }
-
-  private getImageDimensions(image: PDFImage): PageDimensions {
-    return {
-      width: image.width,
-      height: image.height,
-    };
-  }
-
   private calculateImageScaling(
-    imageDimensions: PageDimensions,
-    pageDimensions: PageDimensions
+    pageDimensions: PageDimensions,
+    imgWidth: number,
+    imgHeight: number
   ): ImageScaling {
-    const scaleFactor = Math.min(
-      pageDimensions.width / imageDimensions.width,
-      pageDimensions.height / imageDimensions.height
-    );
+    const maxWidth = pageDimensions.width - 40;
+    const maxHeight = pageDimensions.height - 40;
 
-    const scaledWidth = imageDimensions.width * scaleFactor;
-    const scaledHeight = imageDimensions.height * scaleFactor;
+    const aspectRatio = imgWidth / imgHeight;
+    let scaledWidth = maxWidth;
+    let scaledHeight = maxWidth / aspectRatio;
+
+    if (scaledHeight > maxHeight) {
+      scaledHeight = maxHeight;
+      scaledWidth = maxHeight * aspectRatio;
+    }
+
+    const scaleFactor = scaledWidth / imgWidth;
 
     return {
       scaleFactor,
@@ -184,74 +124,10 @@ export class PdfMergerService {
     const pdfBytes = await pdfDoc.save();
     return new Uint8Array(pdfBytes);
   }
-}
 
-// ============ PDF Preview Service (Responsável por visualização) ============
-
-@Injectable({
-  providedIn: 'root',
-})
-export class PdfPreviewService {
-  private isPreviewOpen = signal<boolean>(false);
-  private previewContent = signal<PdfPreviewContent | null>(null);
-
-  readonly isPreviewOpenSignal: Signal<boolean> = this.isPreviewOpen.asReadonly();
-  readonly previewContentSignal: Signal<PdfPreviewContent | null> =
-    this.previewContent.asReadonly();
-
-  openPreview(file: File): void {
-    this.closePreview(); // Revoke previous URL before opening new preview
-    const url = URL.createObjectURL(file);
-    this.previewContent.set({
-      url,
-      type: file.type,
-      fileName: file.name,
-    });
-    this.isPreviewOpen.set(true);
-  }
-
-  closePreview(): void {
-    this.revokePreviewUrl();
-    this.isPreviewOpen.set(false);
-    this.previewContent.set(null);
-  }
-
-  private revokePreviewUrl(): void {
-    const content = this.previewContent();
-    if (content?.url) {
-      URL.revokeObjectURL(content.url);
-    }
-  }
-}
-
-// ============ PDF Manager (Gerenciador que orquestra tudo) ============
-
-@Injectable({
-  providedIn: 'root',
-})
-export class PdfManager {
-  constructor(private pdfMerger: PdfMergerService, private pdfPreview: PdfPreviewService) {}
-
-  // ─── Merge Methods ───
-  async mergeFilesToPdf(files: File[]): Promise<Uint8Array> {
-    return this.pdfMerger.mergeFilesToPdf(files);
-  }
-
-  // ─── Preview Methods ───
-  openPreview(file: File): void {
-    this.pdfPreview.openPreview(file);
-  }
-
-  closePreview(): void {
-    this.pdfPreview.closePreview();
-  }
-
-  // ─── Signals (Delegados) ───
-  get isPreviewOpenSignal(): Signal<boolean> {
-    return this.pdfPreview.isPreviewOpenSignal;
-  }
-
-  get previewContentSignal(): Signal<PdfPreviewContent | null> {
-    return this.pdfPreview.previewContentSignal;
+  private isImageFile(fileType: string): boolean {
+    return (
+      fileType === this.SUPPORTED_FILE_TYPES.JPEG || fileType === this.SUPPORTED_FILE_TYPES.PNG
+    );
   }
 }

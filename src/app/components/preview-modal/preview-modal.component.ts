@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PdfViewerModule } from 'ng2-pdf-viewer';
-import { PdfManager } from '../../services/pdf-merger.service';
+import { PdfManager } from '../../services/pdf-manager.service';
 
 @Component({
   selector: 'app-preview-modal',
@@ -12,15 +12,27 @@ import { PdfManager } from '../../services/pdf-merger.service';
     <div class="modal-overlay" (click)="closePreview()">
       <div class="modal-container" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h2>{{ pdfManager.previewContentSignal()?.fileName || 'Preview' }}</h2>
+          <div class="header-content">
+            <h2>{{ pdfManager.previewContentSignal()?.fileName || 'Preview' }}</h2>
+            @if (pdfManager.isPasswordProtectedSignal()) {
+            <span class="password-badge" title="Este PDF está protegido por senha">
+              🔒 Protegido por senha
+            </span>
+            }
+          </div>
           <button class="close-button" (click)="closePreview()">
             <span>&times;</span>
           </button>
         </div>
 
         <div class="modal-content">
-          @if (pdfManager.previewContentSignal()) { @if (pdfManager.previewContentSignal()!.type ===
-          'application/pdf') {
+          @if (pdfManager.isPasswordProtectedSignal()) {
+          <div class="password-warning">
+            <p>⚠️ Este PDF está protegido por senha e não pode ser visualizado aqui.</p>
+            <p>Para usar este arquivo, remova a proteção com a senha.</p>
+          </div>
+          } @else if (pdfManager.previewContentSignal()) { @if
+          (pdfManager.previewContentSignal()!.type === 'application/pdf') {
           <pdf-viewer
             [src]="pdfManager.previewContentSignal()!.url"
             [render-text]="true"
@@ -126,6 +138,37 @@ import { PdfManager } from '../../services/pdf-merger.service';
       }
     }
 
+    .header-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-content h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .password-badge {
+      display: inline-block;
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid #ffeaa7;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
     .modal-content {
       flex: 1;
       overflow: auto;
@@ -133,6 +176,26 @@ import { PdfManager } from '../../services/pdf-merger.service';
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .password-warning {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 20px;
+      text-align: center;
+      color: #856404;
+      max-width: 500px;
+    }
+
+    .password-warning p {
+      margin: 8px 0;
+      font-size: 1rem;
+    }
+
+    .password-warning p:first-child {
+      margin-top: 0;
+      font-weight: 600;
     }
 
     .pdf-viewer {
@@ -152,8 +215,19 @@ import { PdfManager } from '../../services/pdf-merger.service';
         height: 95vh;
       }
 
-      .modal-header h2 {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .header-content h2 {
         font-size: 1.2rem;
+      }
+
+      .password-badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
       }
     }
   `,
