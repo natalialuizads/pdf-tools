@@ -1,37 +1,5 @@
-import { Injectable } from '@angular/core';
-import { signal, Signal } from '@angular/core';
+// Este arquivo foi consolidado em PdfService (pdf-merger.service.ts)
+// Funcionalidades de preview e modal agora fazem parte do PdfService
+// que unifica tanto a unificação de PDFs quanto a visualização
 
-export interface ModalContent {
-  url: string;
-  type: string;
-  fileName?: string;
-}
-
-@Injectable({
-  providedIn: 'root',
-})
-export class ModalService {
-  private isOpen = signal<boolean>(false);
-  private content = signal<ModalContent | null>(null);
-
-  readonly isModalOpen: Signal<boolean> = this.isOpen.asReadonly();
-  readonly modalContent: Signal<ModalContent | null> = this.content.asReadonly();
-
-  openModal(modalContent: ModalContent): void {
-    this.content.set(modalContent);
-    this.isOpen.set(true);
-  }
-
-  closeModal(): void {
-    this.revokeObjectUrl();
-    this.isOpen.set(false);
-    this.content.set(null);
-  }
-
-  private revokeObjectUrl(): void {
-    const currentContent = this.content();
-    if (currentContent?.url) {
-      URL.revokeObjectURL(currentContent.url);
-    }
-  }
-}
+// Você pode deletar este arquivo com segurança

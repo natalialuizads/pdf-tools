@@ -1,19 +1,18 @@
 import { Component, signal, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PdfViewerModule } from 'ng2-pdf-viewer';
-import { PdfMergerService } from '../../services/pdf-merger.service';
+import { PdfManager } from '../../services/pdf-merger.service';
+import { PreviewModalComponent } from '../preview-modal/preview-modal.component';
 
 @Component({
   selector: 'app-pdf-image-viewer',
   standalone: true,
-  imports: [CommonModule, PdfViewerModule],
+  imports: [CommonModule, PreviewModalComponent],
   templateUrl: './pdf-image-viewer.component.html',
   styleUrl: './pdf-image-viewer.component.scss',
 })
 export class PdfImageViewerComponent implements OnDestroy {
   files = signal<File[]>([]);
-  selectedFile = signal<{ url: string; type: string } | null>(null);
-  pdfMergerService = inject(PdfMergerService);
+  pdfManager = inject(PdfManager);
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -30,21 +29,10 @@ export class PdfImageViewerComponent implements OnDestroy {
   }
 
   selectFileForPreview(file: File): void {
-    // Revoke previous object URL to prevent memory leaks
-    if (this.selectedFile()?.url) {
-      URL.revokeObjectURL(this.selectedFile()!.url);
-    }
-
-    const url = URL.createObjectURL(file);
-    this.selectedFile.set({ url, type: file.type });
+    this.pdfManager.openPreview(file);
   }
 
   removeFile(index: number): void {
-    const fileToRemove = this.files()[index];
-    if (this.selectedFile()?.url === URL.createObjectURL(fileToRemove)) {
-      URL.revokeObjectURL(this.selectedFile()!.url);
-      this.selectedFile.set(null);
-    }
     this.files.update((currentFiles) => currentFiles.filter((_, i) => i !== index));
   }
 
@@ -55,7 +43,7 @@ export class PdfImageViewerComponent implements OnDestroy {
     }
 
     try {
-      const mergedPdfBytes = await this.pdfMergerService.mergeFilesToPdf(this.files());
+      const mergedPdfBytes = await this.pdfManager.mergeFilesToPdf(this.files());
       // Ensure we have proper Uint8Array with ArrayBuffer backing
       const safeBytes = new Uint8Array(mergedPdfBytes);
       const blob = new Blob([safeBytes], { type: 'application/pdf' });
@@ -79,9 +67,6 @@ export class PdfImageViewerComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Revoke any remaining object URL when the component is destroyed
-    if (this.selectedFile()?.url) {
-      URL.revokeObjectURL(this.selectedFile()!.url);
-    }
+    this.pdfManager.closePreview();
   }
 }

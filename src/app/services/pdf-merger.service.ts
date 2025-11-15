@@ -1,5 +1,8 @@
 import { Injectable } from '@angular/core';
+import { signal, Signal } from '@angular/core';
 import { PDFDocument, PDFPage, PDFImage } from 'pdf-lib';
+
+// ============ Types & Interfaces ============
 
 interface PageDimensions {
   width: number;
@@ -13,6 +16,14 @@ interface ImageScaling {
   x: number;
   y: number;
 }
+
+export interface PdfPreviewContent {
+  url: string;
+  type: string;
+  fileName?: string;
+}
+
+// ============ PDF Merger Service (Responsável por unificar PDFs) ============
 
 @Injectable({
   providedIn: 'root',
@@ -172,5 +183,75 @@ export class PdfMergerService {
   private async savePdfAsUint8Array(pdfDoc: PDFDocument): Promise<Uint8Array> {
     const pdfBytes = await pdfDoc.save();
     return new Uint8Array(pdfBytes);
+  }
+}
+
+// ============ PDF Preview Service (Responsável por visualização) ============
+
+@Injectable({
+  providedIn: 'root',
+})
+export class PdfPreviewService {
+  private isPreviewOpen = signal<boolean>(false);
+  private previewContent = signal<PdfPreviewContent | null>(null);
+
+  readonly isPreviewOpenSignal: Signal<boolean> = this.isPreviewOpen.asReadonly();
+  readonly previewContentSignal: Signal<PdfPreviewContent | null> =
+    this.previewContent.asReadonly();
+
+  openPreview(file: File): void {
+    this.closePreview(); // Revoke previous URL before opening new preview
+    const url = URL.createObjectURL(file);
+    this.previewContent.set({
+      url,
+      type: file.type,
+      fileName: file.name,
+    });
+    this.isPreviewOpen.set(true);
+  }
+
+  closePreview(): void {
+    this.revokePreviewUrl();
+    this.isPreviewOpen.set(false);
+    this.previewContent.set(null);
+  }
+
+  private revokePreviewUrl(): void {
+    const content = this.previewContent();
+    if (content?.url) {
+      URL.revokeObjectURL(content.url);
+    }
+  }
+}
+
+// ============ PDF Manager (Gerenciador que orquestra tudo) ============
+
+@Injectable({
+  providedIn: 'root',
+})
+export class PdfManager {
+  constructor(private pdfMerger: PdfMergerService, private pdfPreview: PdfPreviewService) {}
+
+  // ─── Merge Methods ───
+  async mergeFilesToPdf(files: File[]): Promise<Uint8Array> {
+    return this.pdfMerger.mergeFilesToPdf(files);
+  }
+
+  // ─── Preview Methods ───
+  openPreview(file: File): void {
+    this.pdfPreview.openPreview(file);
+  }
+
+  closePreview(): void {
+    this.pdfPreview.closePreview();
+  }
+
+  // ─── Signals (Delegados) ───
+  get isPreviewOpenSignal(): Signal<boolean> {
+    return this.pdfPreview.isPreviewOpenSignal;
+  }
+
+  get previewContentSignal(): Signal<PdfPreviewContent | null> {
+    return this.pdfPreview.previewContentSignal;
   }
 }
