@@ -10,7 +10,7 @@
       placeholder="Escolha arquivos"
       (change)="onFileSelected($event)"
     />
-    <button (click)="mergeAndDownload()" [disabled]="files().length === 0">
+    <button (click)="mergeAndDownload()" [disabled]="pdfManager.managedFiles().length === 0">
       Merge & Download PDF
     </button>
   </div>
@@ -18,21 +18,30 @@
   <div class="content-section">
     <div class="file-list-panel">
       <h2>Selected Files</h2>
-      @if (files().length === 0) {
+      @if (pdfManager.managedFiles().length === 0) {
       <p>No files selected.</p>
-      } @if (files().length > 0) {
+      } @else {
       <div class="file-list">
-        <div
-          *ngFor="let file of files(); let i = index"
-          (click)="selectFileForPreview(file)"
-          class="file-item"
-        >
-          {{ file.name }} ({{ file.type }})<button
-            (click)="$event.stopPropagation(); removeFile(i)"
-          >
+        @for (managedFile of pdfManager.managedFiles(); track managedFile.id) {
+        <div (click)="selectFileForPreview(managedFile)" class="file-item">
+          <span class="file-name">{{ managedFile.file.name }}</span>
+          <div class="file-status">
+            @if (managedFile.state === 'compressing') {
+            <div class="progress-bar">
+              <div class="progress" [style.width.%]="managedFile.progress"></div>
+            </div>
+            <span class="status-text">Compressing...</span>
+            } @else if (managedFile.state === 'compressed') {
+            <span class="status-text-compressed">✓ Compressed</span>
+            } @else if (managedFile.state === 'error') {
+            <span class="status-text-error">✗ Error</span>
+            }
+          </div>
+          <button (click)="$event.stopPropagation(); removeFile(managedFile.id)" class="remove-btn">
             X
           </button>
         </div>
+        }
       </div>
       }
     </div>

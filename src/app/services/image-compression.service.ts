@@ -7,6 +7,7 @@ export interface CompressionOptions {
   useWebWorker?: boolean;
   fileType?: string;
   initialQuality?: number;
+  onProgress?: (progress: number) => void;
 }
 
 export interface CompressionResult {
@@ -48,10 +49,13 @@ export class ImageCompressionService {
     file: File,
     options?: Partial<CompressionOptions>
   ): Promise<CompressionResult> {
+    console.log(`[ImageCompressionService] compressImage: Attempting to compress ${file.name}`);
     // Verificar cache
     const cacheKey = this.getCacheKey(file);
     if (this.compressionCache.has(cacheKey)) {
-      console.log(`✓ Cache hit para: ${file.name} (sem reprocessamento)`);
+      console.log(`[ImageCompressionService] compressImage: ✓ Cache hit for: ${file.name} (no re-processing)`);
+      // Simular progresso para cache hits
+      options?.onProgress?.(100);
       return this.compressionCache.get(cacheKey)!;
     }
 
@@ -66,8 +70,9 @@ export class ImageCompressionService {
       if (originalSize < 500 * 1024) {
         const skipTime = ((performance.now() - fileStartTime) / 1000).toFixed(2);
         console.log(
-          `⚡ ${file.name} [${originalSizeMB}MB] - já é pequeno, usando original (${skipTime}s)`
+          `[ImageCompressionService] compressImage: ⚡ ${file.name} [${originalSizeMB}MB] - already small, using original (${skipTime}s)`
         );
+        options?.onProgress?.(100); // Progresso completo
         const result: CompressionResult = {
           originalSize,
           compressedSize: originalSize,
@@ -78,17 +83,23 @@ export class ImageCompressionService {
         return result;
       }
 
-      console.log(`⏳ Comprimindo ${file.name} [${originalSizeMB}MB]...`);
+      console.log(`[ImageCompressionService] compressImage: ⏳ Comprimindo ${file.name} [${originalSizeMB}MB]...`);
       const compressionStartTime = performance.now();
 
-      const compressedFile = await imageCompression(file, compressionOptions);
+      const compressedFile = await imageCompression(file, {
+        ...compressionOptions,
+        onProgress: (progress) => {
+          options?.onProgress?.(progress);
+          console.log(`[ImageCompressionService] compressImage: ${file.name} compression progress: ${progress}%`);
+        },
+      });
       const compressedSize = compressedFile.size;
       const compressedSizeMB = (compressedSize / (1024 * 1024)).toFixed(2);
       const compressionTime = ((performance.now() - compressionStartTime) / 1000).toFixed(2);
       const savingsPercent = (((originalSize - compressedSize) / originalSize) * 100).toFixed(1);
 
       console.log(
-        `✅ ${file.name}: ${originalSizeMB}MB → ${compressedSizeMB}MB (${savingsPercent}% menor) em ${compressionTime}s`
+        `[ImageCompressionService] compressImage: ✅ ${file.name}: ${originalSizeMB}MB → ${compressedSizeMB}MB (${savingsPercent}% menor) in ${compressionTime}s`
       );
 
       const result: CompressionResult = {
@@ -102,6 +113,7 @@ export class ImageCompressionService {
       this.compressionCache.set(cacheKey, result);
       return result;
     } catch (error) {
+      console.error(`[ImageCompressionService] compressImage: ❌ Error compressing image "${file.name}": ${error}`);
       throw new Error(
         `Erro ao comprimir imagem "${file.name}": ${
           error instanceof Error ? error.message : 'Erro desconhecido'

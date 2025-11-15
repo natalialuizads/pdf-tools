@@ -73,45 +73,86 @@
         margin-bottom: 15px;
       }
 
-      ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+      .file-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
 
-        li {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 10px;
-          margin-bottom: 5px;
-          background-color: #e9ecef;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.2s ease;
-          word-break: break-all;
+      .file-item {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        word-break: break-all;
 
-          &:hover {
-            background-color: #d6d9dc;
-          }
+        &:hover {
+          background-color: #d6d9dc;
+        }
+      }
 
-          button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            cursor: pointer;
-            margin-left: 10px;
+      .file-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-            &:hover {
-              background-color: #c82333;
-            }
-          }
+      .file-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #555;
+      }
+
+      .progress-bar {
+        width: 100px;
+        height: 8px;
+        background-color: #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .progress {
+        height: 100%;
+        background-color: #007bff;
+        transition: width 0.3s ease;
+      }
+
+      .status-text {
+        font-style: italic;
+      }
+
+      .status-text-compressed {
+        color: #28a745;
+        font-weight: bold;
+      }
+
+      .status-text-error {
+        color: #dc3545;
+        font-weight: bold;
+      }
+
+      .remove-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+
+        &:hover {
+          background-color: #c82333;
         }
       }
     }
