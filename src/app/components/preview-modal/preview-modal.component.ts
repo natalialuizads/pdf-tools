@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
 import { PdfViewerModule } from 'ng2-pdf-viewer';
 import { PdfManager } from '../../services/pdf-manager.service';
 
@@ -34,7 +34,7 @@ import { PdfManager } from '../../services/pdf-manager.service';
           } @else if (pdfManager.previewContentSignal()) { @if
           (pdfManager.previewContentSignal()!.type === 'application/pdf') {
           <pdf-viewer
-            [src]="pdfManager.previewContentSignal()!.url"
+            [src]="pdfManager.previewContentSignal()!.base64"
             [render-text]="true"
             [original-size]="false"
             [fit-to-page]="true"

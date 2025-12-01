@@ -1,10 +1,9 @@
-import { Injectable, signal } from '@angular/core';
-import { Signal } from '@angular/core';
-import { PdfValidationService, PdfValidationResult } from './pdf-validation.service';
-import { PdfMergerService } from './pdf-merger.service';
-import { PdfVisualizationService, PdfPreviewContent } from './pdf-visualization.service';
-import { ImageCompressionService } from './image-compression.service';
+import { Injectable, signal, Signal } from '@angular/core';
 import { ManagedFile } from './file-manager.models';
+import { ImageCompressionService } from './image-compression.service';
+import { PdfMergerService } from './pdf-merger.service';
+import { PdfValidationResult, PdfValidationService } from './pdf-validation.service';
+import { PdfPreviewContent, PdfVisualizationService } from './pdf-visualization.service';
 
 /**
  * PdfManager: Orquestrador Principal
@@ -291,11 +290,25 @@ export class PdfManager {
           ? (await this.pdfValidation.validatePdf(file)).requiresPassword
           : false;
 
-      this.pdfVisualization.openPreview(file, isProtected);
+      let base64: string | undefined;
+      if (file.type === 'application/pdf') {
+        base64 = await this.fileToBase64(file);
+      }
+
+      this.pdfVisualization.openPreview(file, isProtected, base64);
     } catch (error) {
       console.error('Erro ao abrir preview:', error);
       this.pdfVisualization.openPreview(file, false);
     }
+  }
+
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
   }
 
   /**

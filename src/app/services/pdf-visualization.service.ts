@@ -1,10 +1,10 @@
-import { Injectable } from '@angular/core';
-import { signal, Signal } from '@angular/core';
+import { Injectable, signal, Signal } from '@angular/core';
 
 export interface PdfPreviewContent {
   url: string;
   type: string;
   fileName?: string;
+  base64?: string;
 }
 
 /**
@@ -29,14 +29,16 @@ export class PdfVisualizationService {
    * Abre o preview de um arquivo
    * @param file Arquivo a visualizar
    * @param isProtectedByPassword Indica se o PDF tem senha
+   * @param base64 Conteúdo base64 do arquivo (opcional)
    */
-  openPreview(file: File, isProtectedByPassword: boolean = false): void {
+  openPreview(file: File, isProtectedByPassword: boolean = false, base64?: string): void {
     this.closePreview(); // Revoga URL anterior
     const url = URL.createObjectURL(file);
     this.previewContent.set({
       url,
       type: file.type,
       fileName: file.name,
+      base64,
     });
     this.isPasswordProtected.set(isProtectedByPassword);
     this.isPreviewOpen.set(true);
